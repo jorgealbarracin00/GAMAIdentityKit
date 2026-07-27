@@ -49,6 +49,43 @@ struct GAMAIdentityKitTests {
         #expect(await transport.requests.first?.path == "register")
     }
 
+    @Test(arguments: [
+        (
+            400,
+            #"{"error":{"code":"INVALID_REGISTRATION_DETAILS","message":"Registration details are invalid"}}"#,
+            GAMAIdentityError.invalidRegistrationDetails
+        ),
+        (
+            400,
+            #"{"error":{"code":"INVALID_REQUEST","message":"Invalid request body"}}"#,
+            GAMAIdentityError.invalidResponse
+        ),
+        (
+            409,
+            #"{"error":{"code":"REGISTRATION_UNAVAILABLE","message":"Registration unavailable"}}"#,
+            GAMAIdentityError.registrationUnavailable
+        ),
+        (
+            400,
+            #"{"error":{"code":"UNRECOGNIZED_VALIDATION","message":"Unknown validation"}}"#,
+            GAMAIdentityError.unknown
+        )
+    ])
+    func registrationErrorMapping(
+        status: Int,
+        body: String,
+        expected: GAMAIdentityError
+    ) async {
+        let transport = MockTransport(responses: [
+            HTTPResponse(data: Data(body.utf8), statusCode: status)
+        ])
+        let client = makeClient(transport: transport)
+
+        await #expect(throws: expected) {
+            try await client.register(email: "new@example.com", password: "invalid")
+        }
+    }
+
     @Test("Session restoration does not call the network")
     func restoreSession() async throws {
         let expected = GAMAIdentitySession(userID: "u1", email: "a@example.com")

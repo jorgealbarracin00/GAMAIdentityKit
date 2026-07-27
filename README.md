@@ -185,6 +185,8 @@ Public operations expose only semantic `GAMAIdentityError` values:
 
 - `network`
 - `authenticationFailed`
+- `invalidRegistrationDetails`
+- `registrationUnavailable`
 - `sessionExpired`
 - `invalidResponse`
 - `configurationError`
@@ -194,6 +196,40 @@ Public operations expose only semantic `GAMAIdentityError` values:
 The SDK never exposes URL-loading errors, HTTP status codes, backend error payloads,
 or authentication secrets. `LocalizedError` descriptions, failure reasons, and
 recovery suggestions are available for diagnostics and user-experience decisions.
+
+Registration failures can be handled without inspecting backend or transport data:
+
+```swift
+do {
+    _ = try await identity.register(email: email, password: password)
+} catch GAMAIdentityError.invalidRegistrationDetails {
+    // Ask the user to check the email and password requirements.
+} catch GAMAIdentityError.registrationUnavailable {
+    // Suggest signing in or using different account details.
+} catch let error as GAMAIdentityError {
+    switch error {
+    case .network, .serviceUnavailable:
+        // Offer an appropriate retry experience.
+    default:
+        // Present a safe generic failure.
+    }
+} catch {
+    // Handle non-SDK failures from surrounding application work.
+}
+```
+
+When exhaustively switching over `GAMAIdentityError`, consumers should include
+`@unknown default` so adding a semantic error in a future compatible release does
+not leave the application without a safe fallback:
+
+```swift
+switch error {
+case .authenticationFailed:
+    // Ask the user to verify their credentials.
+@unknown default:
+    // Present a safe generic failure.
+}
+```
 
 ## Troubleshooting
 

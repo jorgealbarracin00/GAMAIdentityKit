@@ -102,6 +102,14 @@ struct IdentityAPI: Sendable {
         guard !(200..<300).contains(response.statusCode) else { return }
         let code = (try? decoder.decode(APIErrorEnvelope.self, from: response.data))?.error.code
         switch response.statusCode {
+        case 400 where code == "INVALID_REGISTRATION_DETAILS":
+            throw GAMAIdentityError.invalidRegistrationDetails
+        case 400 where code == "INVALID_REQUEST":
+            // The SDK creates request bodies, so this indicates a contract mismatch
+            // rather than ordinary user-entered registration validation.
+            throw GAMAIdentityError.invalidResponse
+        case 409 where code == "REGISTRATION_UNAVAILABLE":
+            throw GAMAIdentityError.registrationUnavailable
         case 401 where code == "SESSION_INVALID" || code == "SESSION_EXPIRED":
             throw GAMAIdentityError.sessionExpired
         case 401, 403:

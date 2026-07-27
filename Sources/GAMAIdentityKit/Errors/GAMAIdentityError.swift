@@ -11,6 +11,18 @@ public enum GAMAIdentityError: Error, Equatable, Sendable {
     /// The supplied credentials were not accepted.
     case authenticationFailed
 
+    /// The supplied email or password does not meet the service's registration
+    /// requirements.
+    ///
+    /// This case does not expose which individual requirement was rejected.
+    case invalidRegistrationDetails
+
+    /// Registration cannot be completed with the supplied account details.
+    ///
+    /// This case intentionally does not confirm whether a particular account
+    /// already exists.
+    case registrationUnavailable
+
     /// No usable authenticated session exists, or the service rejected the
     /// restored session as expired or invalid.
     case sessionExpired
@@ -34,6 +46,8 @@ extension GAMAIdentityError: LocalizedError {
         switch self {
         case .network: "The identity service could not be reached."
         case .authenticationFailed: "The email or password was not accepted."
+        case .invalidRegistrationDetails: "The registration details are invalid."
+        case .registrationUnavailable: "Registration is unavailable for these details."
         case .sessionExpired: "The session is no longer valid."
         case .invalidResponse: "The identity service returned an invalid response."
         case .configurationError: "The identity client configuration is invalid."
@@ -47,6 +61,10 @@ extension GAMAIdentityError: LocalizedError {
         switch self {
         case .network: "A network connection to GAMA Identity could not be established."
         case .authenticationFailed: "GAMA Identity could not verify the supplied credentials."
+        case .invalidRegistrationDetails:
+            "The email or password does not meet the registration requirements."
+        case .registrationUnavailable:
+            "GAMA Identity cannot register an account using the supplied details."
         case .sessionExpired: "The saved session is missing, expired, or no longer accepted."
         case .invalidResponse: "The response did not match the supported identity contract."
         case .configurationError: "The configured service URL is not a valid HTTP or HTTPS base URL."
@@ -62,6 +80,10 @@ extension GAMAIdentityError: LocalizedError {
             "Check the network connection and try again."
         case .authenticationFailed:
             "Verify the email and password, then try again."
+        case .invalidRegistrationDetails:
+            "Check the supplied email and password, then try again."
+        case .registrationUnavailable:
+            "Try signing in or use different account details."
         case .sessionExpired:
             "Ask the user to sign in again."
         case .configurationError:
