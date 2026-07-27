@@ -2,6 +2,20 @@
 
 All notable changes to GAMAIdentityKit are documented in this file.
 
+## 1.0.3
+
+### Changed
+
+- Separated registration and login transport envelopes from the internal
+  authenticated-session model.
+- Centralized validated authentication mapping and `StoredSession` construction.
+
+### Fixed
+
+- Added compatibility with the production login response contract.
+- Added exact login contract and invalid-response tests while preserving
+  registration behavior and the public API.
+
 ## 1.0.2
 
 ### Fixed

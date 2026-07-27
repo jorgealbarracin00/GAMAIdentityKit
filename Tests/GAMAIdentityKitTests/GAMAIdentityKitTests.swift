@@ -16,11 +16,11 @@ struct GAMAIdentityKitTests {
         }
     }
 
-    @Test("Login encodes credentials, persists the private token, and publishes safe session data")
+    @Test("Login decodes the exact production contract")
     func loginFlow() async throws {
         let transport = MockTransport(responses: [
             HTTPResponse(
-                data: Data(#"{"token":"private-token","user":{"id":"user-1","email":"person@example.com"},"session":{"expiresAt":"2030-01-01T00:00:00Z"}}"#.utf8),
+                data: Data(Self.loginResponse.utf8),
                 statusCode: 200
             )
         ])
@@ -28,9 +28,10 @@ struct GAMAIdentityKitTests {
         let client = makeClient(transport: transport, store: store)
 
         let session = try await client.login(email: " person@example.com ", password: "secret")
-        #expect(session.userID == "user-1")
+        #expect(session.userID == "123")
         #expect(session.email == "person@example.com")
-        #expect(store.value?.token == "private-token")
+        #expect(store.value?.token == "ABC123")
+        #expect(store.value?.session == session)
         #expect(await client.currentSession == session)
 
         let request = try #require(await transport.requests.first)
@@ -39,6 +40,24 @@ struct GAMAIdentityKitTests {
         #expect(request.bearerToken == nil)
         let credentials = try JSONDecoder().decode([String: String].self, from: #require(request.body))
         #expect(credentials == ["email": "person@example.com", "password": "secret"])
+    }
+
+    @Test(arguments: [
+        #"{"session":{"humanIdentityId":"123","expiresAt":"2026-07-28T05:34:30.042Z"}}"#,
+        #"{"session":{"sessionId":"ABC123","expiresAt":"2026-07-28T05:34:30.042Z"}}"#
+    ])
+    func invalidLoginContract(body: String) async {
+        let transport = MockTransport(responses: [
+            HTTPResponse(data: Data(body.utf8), statusCode: 200)
+        ])
+        let client = makeClient(transport: transport)
+
+        await #expect(throws: GAMAIdentityError.invalidResponse) {
+            try await client.login(
+                email: "person@example.com",
+                password: "a-valid-password"
+            )
+        }
     }
 
     @Test("Registration decodes the exact production contract")
@@ -87,6 +106,35 @@ struct GAMAIdentityKitTests {
                 password: "a-valid-password"
             )
         }
+    }
+
+    @Test("Registration and login produce identical stored sessions")
+    func authenticationContractsProduceIdenticalStoredSessions() async throws {
+        let registrationStore = MemorySessionStore()
+        let registrationClient = makeClient(
+            transport: MockTransport(responses: [
+                HTTPResponse(data: Data(Self.registrationResponse.utf8), statusCode: 201)
+            ]),
+            store: registrationStore
+        )
+        let loginStore = MemorySessionStore()
+        let loginClient = makeClient(
+            transport: MockTransport(responses: [
+                HTTPResponse(data: Data(Self.loginResponse.utf8), statusCode: 200)
+            ]),
+            store: loginStore
+        )
+
+        _ = try await registrationClient.register(
+            email: "person@example.com",
+            password: "a-valid-password"
+        )
+        _ = try await loginClient.login(
+            email: "person@example.com",
+            password: "a-valid-password"
+        )
+
+        #expect(registrationStore.value == loginStore.value)
     }
 
     @Test(arguments: [
@@ -223,6 +271,18 @@ struct GAMAIdentityKitTests {
     private static let registrationResponse = """
         {
           "humanIdentityId":"123",
+          "session":{
+            "sessionId":"ABC123",
+            "humanIdentityId":"123",
+            "createdAt":"2026-07-27T05:34:30.042Z",
+            "lastAccessedAt":"2026-07-27T05:34:30.042Z",
+            "expiresAt":"2026-07-28T05:34:30.042Z"
+          }
+        }
+        """
+
+    private static let loginResponse = """
+        {
           "session":{
             "sessionId":"ABC123",
             "humanIdentityId":"123",
