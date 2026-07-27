@@ -2,6 +2,15 @@
 
 All notable changes to GAMAIdentityKit are documented in this file.
 
+## 1.0.2
+
+### Fixed
+
+- Added compatibility with the production registration response.
+- Added exact registration contract tests and defensive validation for required
+  identity and session fields.
+- Improved registration response decoding while leaving login decoding unchanged.
+
 ## 1.0.1
 
 ### Added

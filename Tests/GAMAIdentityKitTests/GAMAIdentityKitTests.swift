@@ -41,12 +41,52 @@ struct GAMAIdentityKitTests {
         #expect(credentials == ["email": "person@example.com", "password": "secret"])
     }
 
-    @Test("Register uses the registration endpoint")
-    func registerFlow() async throws {
-        let transport = MockTransport(responses: [Self.authResponse])
-        let client = makeClient(transport: transport)
-        _ = try await client.register(email: "new@example.com", password: "secret")
+    @Test("Registration decodes the exact production contract")
+    func registrationContract() async throws {
+        let transport = MockTransport(responses: [
+            HTTPResponse(data: Data(Self.registrationResponse.utf8), statusCode: 201)
+        ])
+        let store = MemorySessionStore()
+        let client = makeClient(transport: transport, store: store)
+
+        let session = try await client.register(
+            email: "new@example.com",
+            password: "a-valid-password"
+        )
+
         #expect(await transport.requests.first?.path == "register")
+        #expect(store.value?.token == "ABC123")
+        #expect(store.value?.session.userID == "123")
+        #expect(store.value?.session.email == "new@example.com")
+        #expect(session.userID == "123")
+        #expect(session.email == "new@example.com")
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let expectedExpiration = try #require(
+            formatter.date(from: "2026-07-28T05:34:30.042Z")
+        )
+        #expect(store.value?.session.expiresAt == expectedExpiration)
+        #expect(session.expiresAt == expectedExpiration)
+    }
+
+    @Test(arguments: [
+        #"{"humanIdentityId":"123","session":{"humanIdentityId":"123","expiresAt":"2026-07-28T05:34:30.042Z"}}"#,
+        #"{"session":{"sessionId":"ABC123","humanIdentityId":"123","expiresAt":"2026-07-28T05:34:30.042Z"}}"#,
+        #"{"humanIdentityId":"123","session":{"sessionId":"ABC123","humanIdentityId":"456","expiresAt":"2026-07-28T05:34:30.042Z"}}"#
+    ])
+    func invalidRegistrationContract(body: String) async {
+        let transport = MockTransport(responses: [
+            HTTPResponse(data: Data(body.utf8), statusCode: 201)
+        ])
+        let client = makeClient(transport: transport)
+
+        await #expect(throws: GAMAIdentityError.invalidResponse) {
+            try await client.register(
+                email: "new@example.com",
+                password: "a-valid-password"
+            )
+        }
     }
 
     @Test(arguments: [
@@ -180,10 +220,18 @@ struct GAMAIdentityKitTests {
         }
     }
 
-    private static let authResponse = HTTPResponse(
-        data: Data(#"{"sessionToken":"private","user":{"id":"u1","email":"a@example.com"}}"#.utf8),
-        statusCode: 200
-    )
+    private static let registrationResponse = """
+        {
+          "humanIdentityId":"123",
+          "session":{
+            "sessionId":"ABC123",
+            "humanIdentityId":"123",
+            "createdAt":"2026-07-27T05:34:30.042Z",
+            "lastAccessedAt":"2026-07-27T05:34:30.042Z",
+            "expiresAt":"2026-07-28T05:34:30.042Z"
+          }
+        }
+        """
 
     private func makeClient(
         transport: MockTransport,
